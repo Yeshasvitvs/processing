@@ -54,7 +54,10 @@ eventHistoryBuffer event_history;
 spatialFilters sfilters;
 temporalFilters tfilters;
 
+double conv_value_even_biphasic; //Even+biphasic convolution value storage variable
+double conv_value_odd_monophasic; //Odd+monophaisc convolution value storage variable
 double conv_value; //Convolution value storage variable
+
 
 emorph::vtsHelper unwrap;
 
@@ -146,7 +149,10 @@ int main(int argc, char *argv[])
 
                 if(channel==0){
 
-                    conv_value=0; //Filter convolution value reset to zero for each event processing
+                    // convolution value reset to zero for each event processing
+                    conv_value_even_biphasic=0;
+                    conv_value_odd_monophasic=0;
+                    conv_value=0;
 
                     //NOTE : Update the activity when an event is about to be processed
                     // std::cout<<"Pre "<<activity_mat.queryActivity(posX,posY);
@@ -159,6 +165,9 @@ int main(int argc, char *argv[])
 
                     // std::cout<<"  "<<convValue<<std::endl; //Debug Code
                     // std::cout<<"Event processing done!!!"<<std::endl; //Debug Code
+
+                    conv_value = conv_value_odd_monophasic + conv_value_odd_monophasic;
+                    std::cout << "Final convolution value : " << conv_value << std::endl;//Debug Code
 
                     //NOTE : Update the activity after event processing
                     //std::cout<<" Pre Activity "<<activity_mat.queryActivity(posX,posY);
@@ -230,7 +239,7 @@ double  spatialProcessing (emorph::AddressEvent &event){
 
     int posX    = event.getX();
     int posY    = event.getY();
-    int pol     = event.getPolarity();
+    //int polarity     = event.getPolarity();
 
 
     //TODO include the theta code later
@@ -247,10 +256,14 @@ double  spatialProcessing (emorph::AddressEvent &event){
             if(pixelX >= 0 && pixelY >= 0 && pixelX <= MAX_RES && pixelY <= MAX_RES){ //Checking for borders
 
                 long double activity_value = activity_mat.queryActivity(pixelX,pixelY);
+
+                //Even filter convolution
                 long double even_conv = activity_value * sfilters.filter_array[3].spatial_even[j][i];
-                //long double odd_conv = activity_value * sfilters.filter_array[3].spatial_odd[j][i];
-                //convValue = convValue + even_conv + odd_conv;
-                conv_value = conv_value + even_conv;
+                conv_value_even_biphasic = conv_value_even_biphasic + even_conv;
+
+                //Odd filter convolution
+                long double odd_conv = activity_value * sfilters.filter_array[3].spatial_odd[j][i];
+                conv_value_odd_monophasic= conv_value_odd_monophasic + odd_conv;
 
 
             }
@@ -272,7 +285,7 @@ double temporalProcessing(emorph::AddressEvent &event){
 
     int posX    = event.getX();
     int posY    = event.getY();
-    int pol     = event.getPolarity();
+    //int polarity     = event.getPolarity();
     double event_time = unwrap(event.getStamp()); //Get the current event time stamp
     //std::cout<< "Time stamp : " << event_time <<std::endl;//Debug Code
 
@@ -283,14 +296,9 @@ double temporalProcessing(emorph::AddressEvent &event){
     tfilters.monophasic_temporal_it = tfilters.monophasic_temporal.begin();
     tfilters.biphasic_temporal_it = tfilters.biphasic_temporal.begin();
 
-    //NOTE  : problem with the temporal filter iterators
+
     //std::cout << "Monophasic filter vaalue : "<< *tfilters.monophasic_temporal_it <<std::endl;//Debug code
-    //TODO temporal filter processing at the event location
 
-    //NOTE : Little trick to avoid accessing list with iterators if there is only one element
-
-
-    //cout<<"Inside the IF trick"<<endl;//Debug Code
     //std::cout << "Buffer Size : " <<  event_history.timeStampList[posX][posY].size() << std::endl;//Debug Code
     event_history.timeStampsList_it = event_history.timeStampList[posX][posY].rbegin(); //Going from latest event pushed in the back
     //std::cout << "Buffer value back : " <<  *event_history.timeStampsList_it<<std::endl;//Debug Code
@@ -302,12 +310,20 @@ double temporalProcessing(emorph::AddressEvent &event){
          //std::cout << "Buffer value : " <<  *event_history.timeStampsList_it<<std::endl;//Debug Code
          long double temporal_difference = event_time - *event_history.timeStampsList_it; //The first value is always zero
          temporal_difference = temporal_difference / 1000000 ; //Converting from Micro secs TODO : check if it is right
+
          //std::cout << "Temporal difference : " << temporal_difference <<std::endl; //Debug code
-         conv_value = conv_value + temporal_difference * (*tfilters.monophasic_temporal_it) ;
-         std::cout<< "Convolution Value : " << conv_value <<std::endl;//Debug Code
+         conv_value_odd_monophasic = conv_value_odd_monophasic + temporal_difference * (*tfilters.monophasic_temporal_it) ;
+         conv_value_even_biphasic = conv_value_even_biphasic + temporal_difference * (*tfilters.biphasic_temporal_it) ;
+
+         //std::cout<< "Convolution Value oddMonophasic : " << conv_value_odd_monophasic <<std::endl;//Debug Code
+         //std::cout<< "Convolution Value evenBiphasic : " << conv_value_even_biphasic <<std::endl;//Debug Code
+
          ++event_history.timeStampsList_it;
          ++list_length;
+
+         //Increment temporal filter iterators
          ++tfilters.monophasic_temporal_it;
+         ++tfilters.biphasic_temporal_it;
     }
 
 }
