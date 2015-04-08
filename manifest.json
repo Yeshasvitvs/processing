@@ -1,0 +1,15 @@
+{
+    "name": "com.ubuntu.developer.username.processing",
+    "description": "description of processing",
+    "framework": "ubuntu-sdk-14.04-qml",
+    "architecture": "all",
+    "title": "processing",
+    "hooks": {
+        "processing": {
+            "apparmor": "processing.json",
+            "desktop": "processing.desktop"
+        }
+    },
+    "version": "0.1",
+    "maintainer": ""
+}
