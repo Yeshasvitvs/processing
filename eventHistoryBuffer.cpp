@@ -7,7 +7,7 @@ eventHistoryBuffer::eventHistoryBuffer(){ //one time initialization
     height = MAX_RES;
     width = MAX_RES;
     bufferSize = 20;
-    disp = true;
+    disp = false;
 
     //Setting the memory for array of Lists
 

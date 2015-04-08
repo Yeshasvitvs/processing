@@ -150,7 +150,7 @@ int main(int argc, char *argv[])
                     int pol     = aep->getPolarity();
 
                     double ev_t = unwrap((*q_it)->getStamp()); //Get the current event time stamp
-                    cout<< "Time stamp : " << ev_t <<endl;
+                    //std::cout<< "Time stamp : " << ev_t <<std::endl;//Debug Code
                    // std::cout<<"Pre "<<activity_mat.queryActivity(posX,posY);
                     activity_mat.addEvent(*aep); //Adding event to the activityMat, This is where activity is set to 1
                    // std::cout<<" New "<<activity_mat.queryActivity(posX,posY)<<std::endl;
@@ -195,7 +195,7 @@ int main(int argc, char *argv[])
                     tfilters.monophasic_temporal_it = tfilters.monophasic_temporal.begin();
                     tfilters.biphasic_temporal_it = tfilters.biphasic_temporal.begin();
 
-                    //std::cout << "Temporal filter processing..." << std::endl; //Debug code
+                    std::cout << "Temporal filter processing..." << std::endl; //Debug code
 
                     //NOTE  : problem with the temporal filter iterators
                     //std::cout << "Monophasic filter vaalue : "<< *tfilters.monophasic_temporal_it <<std::endl;//Debug code
@@ -213,10 +213,12 @@ int main(int argc, char *argv[])
                     //NOTE : List size is always limited to the buffer size, took care of this in the eventbuffer code
                     for( int list_length = 1 ; list_length <= event_history.timeStampList[posX][posY].size() ; ){
 
-                         std::cout << "Buffer value : " <<  *event_history.timeStampsList_it<<std::endl;//Debug Code
+                         //std::cout << "Buffer value : " <<  *event_history.timeStampsList_it<<std::endl;//Debug Code
                          long double temporal_difference = ev_t - *event_history.timeStampsList_it; //The first value is always zero
-                         std::cout << "Temporal difference : " << temporal_difference <<std::endl; //Debug code
+                         temporal_difference = temporal_difference / 1000000 ; //Converting from Micro secs TODO : check if it is right
+                         //std::cout << "Temporal difference : " << temporal_difference <<std::endl; //Debug code
                          conv_value = conv_value + temporal_difference * (*tfilters.monophasic_temporal_it) ;
+                         std::cout<< "Convolution Value : " << conv_value <<std::endl;//Debug Code
                          ++event_history.timeStampsList_it;
                          ++list_length;
                          ++tfilters.monophasic_temporal_it;
