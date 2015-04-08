@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
    emorph::vtsHelper unwrap;
 
 
-   while(true){ //wait till the input port receives data and run
+   while(true){ //TODO wait till the input port receives data and run
 
 
 	tempEvents = inputPort.read(true); //Read the incoming events into a temporary vBottle
@@ -150,15 +150,13 @@ int main(int argc, char *argv[])
                     int pol     = aep->getPolarity();
 
                     double ev_t = unwrap((*q_it)->getStamp()); //Get the current event time stamp
-                    //cout<< "Time stamp : " << ev_t <<endl;
+                    cout<< "Time stamp : " << ev_t <<endl;
                    // std::cout<<"Pre "<<activity_mat.queryActivity(posX,posY);
                     activity_mat.addEvent(*aep); //Adding event to the activityMat, This is where activity is set to 1
                    // std::cout<<" New "<<activity_mat.queryActivity(posX,posY)<<std::endl;
 
                    //Updating event history buffer with time stamps
                    event_history.updateList(*aep);
-
-
 
                     //std::cout<< "Event at "<< "X : "<<posX<<" Y : "<<posY <<std::endl; //Debug code
                     //std::cout << "Spatial filter processing..." << std::endl; //Debug code
@@ -204,43 +202,25 @@ int main(int argc, char *argv[])
                     //TODO temporal filter processing at the event location
 
                     //NOTE : Little trick to avoid accessing list with iterators if there is only one element
-                    if(event_history.timeStampList[posX][posY].size()>1){
-
-                        cout<<"Inside the IF trick"<<endl;//Debug Code
 
 
-                        event_history.timeStampsList_it = event_history.timeStampList[posX][posY].begin();
+                    //cout<<"Inside the IF trick"<<endl;//Debug Code
+                    //std::cout << "Buffer Size : " <<  event_history.timeStampList[posX][posY].size() << std::endl;//Debug Code
+                    event_history.timeStampsList_it = event_history.timeStampList[posX][posY].rbegin(); //Going from latest event pushed in the back
+                    //std::cout << "Buffer value back : " <<  *event_history.timeStampsList_it<<std::endl;//Debug Code
+                    //std::cout << "Buffer value front : " <<  event_history.timeStampList[posX][posY].front() << std::endl;//Debug Code
+                    //TODO figure out a way to do temporal processing
+                    //NOTE : List size is always limited to the buffer size, took care of this in the eventbuffer code
+                    for( int list_length = 1 ; list_length <= event_history.timeStampList[posX][posY].size() ; ){
 
-
-                        //TODO figure out a way to do temporal processing
-                        for( ; event_history.timeStampsList_it != event_history.timeStampList[posX][posY].end() ; event_history.timeStampsList_it++){
-
-                            std::cout << "Buffer Size : " <<  event_history.timeStampList[posX][posY].size() << std::endl;//Debug Code
-
-                            std::cout << "Buffer value : " <<  *event_history.timeStampsList_it<<std::endl;//Debug Code
-                            long double temporal_difference = ev_t - *event_history.timeStampsList_it++;
-                            //NOTE: The resolution is so small and leads to 0 value for temporal difference
-                            std::cout << "Temporal difference : " << temporal_difference <<std::endl; //Debug code
-                            conv_value = conv_value + temporal_difference * (*tfilters.monophasic_temporal_it) ;
-                            tfilters.monophasic_temporal_it++;
-
-
-                        }
-
+                         std::cout << "Buffer value : " <<  *event_history.timeStampsList_it<<std::endl;//Debug Code
+                         long double temporal_difference = ev_t - *event_history.timeStampsList_it; //The first value is always zero
+                         std::cout << "Temporal difference : " << temporal_difference <<std::endl; //Debug code
+                         conv_value = conv_value + temporal_difference * (*tfilters.monophasic_temporal_it) ;
+                         ++event_history.timeStampsList_it;
+                         ++list_length;
+                         ++tfilters.monophasic_temporal_it;
                     }
-                    else{
-
-                        //cout<<"Inside the else trick"<<endl;//Debug Code
-                        long double temporal_difference = ev_t - event_history.timeStampList[posX][posY].front();
-                        //std::cout << "Temporal difference : " << temporal_difference <<std::endl; //Debug code
-                        conv_value = conv_value + temporal_difference * (*tfilters.monophasic_temporal_it) ;
-                        //event_history.timeStampList[posX][posY].pop_front(); //Removing the oldest event time stamp
-
-                    }
-
-
-
-
 
 
                     //std::cout << "Mono conv value : "<< mono_conv << std::endl;//Debug Code
@@ -248,7 +228,7 @@ int main(int argc, char *argv[])
                     //After processing each event update the whole activity matrix
                     long double maxvalue=0;
 
-                    for(int v=0; v< MAX_RES; v++){
+                    /*for(int v=0; v< MAX_RES; v++){
 
                 		for(int u=0; u< MAX_RES; u++){
 
@@ -284,9 +264,9 @@ int main(int argc, char *argv[])
                 	}*/
                 	//cout << eventImageMat <<endl;
                 	//std::cout<<"Image processing done"<<std::endl;//Debug Code
-                	cv::namedWindow("EVENT IMAGE",WINDOW_NORMAL);
-                    cv::imshow("EVENT IMAGE", eventImageMat);
-                    cv::waitKey(10);
+                    //cv::namedWindow("EVENT IMAGE",WINDOW_NORMAL);
+                    //cv::imshow("EVENT IMAGE", eventImageMat);
+                    //cv::waitKey(10);
                 } //End of channel if, one event processing done
 
 	    }//End of event q loop

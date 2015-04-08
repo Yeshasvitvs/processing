@@ -7,7 +7,7 @@ eventHistoryBuffer::eventHistoryBuffer(){ //one time initialization
     height = MAX_RES;
     width = MAX_RES;
     bufferSize = 20;
-    disp = false;
+    disp = true;
 
     //Setting the memory for array of Lists
 
@@ -49,9 +49,7 @@ double eventHistoryBuffer::updateList(emorph::AddressEvent &event){
 
 
     //Call the display
-    if(disp==true)
-
-        display();
+    if(disp==true){ display(); }
 
 
     return 0;
@@ -62,13 +60,11 @@ void eventHistoryBuffer::display(){
 
 
     //Checking the event history buffer size
-    std::cout << "Buffer Size : " <<  timeStampList[x][y].size() << std::endl;//Debug Code
+    std::cout << "Stored Buffer Size : " <<  timeStampList[x][y].size() << std::endl;//Debug Code
 
     if(!timeStampList[x][y].empty()){
 
-        double list_value = timeStampList[x][y].front();
-        //timeStampList[x][y].pop_front();
-        std::cout << "Buffer value : " <<  list_value << std::endl; //Debug Code
+        std::cout << "Stored Buffer value : " << timeStampList[x][y].front() << std::endl; //Debug Code
 
     }
 

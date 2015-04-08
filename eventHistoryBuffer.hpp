@@ -32,7 +32,7 @@ public:
 
     std::list<double> timeStampList[128][128]; //TODO use the global macro definition
 
-    std::list<double>::iterator timeStampsList_it; //Also should the buffer be initialized to zero
+    std::list<double>::reverse_iterator timeStampsList_it; //Also should the buffer be initialized to zero
 
     //Constructor
     eventHistoryBuffer();
