@@ -30,16 +30,39 @@
 #include "spatialFilters.hpp"
 #include "temporalFilters.hpp"
 
+
 using namespace yarp::os;
 using namespace emorph;
 using namespace std;
 using namespace cv;
 
+//Function definition
+double spatialProcessing(emorph::AddressEvent&);
+double temporalProcessing(emorph::AddressEvent&);
+
+//Global variables
+
+double decayRate = 50;
+//ActivityMat instances
+emorph::activityMat activity_mat(MAX_RES,MAX_RES, decayRate);
+
+//Event History buffer instance
+eventHistoryBuffer event_history;
+
+
+//Creating an instances of filters
+spatialFilters sfilters;
+temporalFilters tfilters;
+
+double conv_value; //Convolution value storage variable
+
+emorph::vtsHelper unwrap;
+
 int main(int argc, char *argv[])
 {
     bool normalize=false;
     long double activity_threshold = 0.2;
-	double decayRate = 50;
+
    //Resource finder 
    yarp::os::ResourceFinder rf;
    rf.configure(argc,argv);
@@ -58,14 +81,6 @@ int main(int argc, char *argv[])
    emorph::vBottle *tempEvents; //Temporary events
    
    cv::Mat eventImageMat = Mat(128,128,CV_32FC1,Scalar(0)); //OpenCV MAT variable
-
-   //ActivityMat instances
-   emorph::activityMat activity_mat(MAX_RES,MAX_RES, decayRate);
-
-   //Event History buffer instance
-   eventHistoryBuffer event_history;
-
-
 
    //Using Resource finder for port names
    string inputPortName = rf.find("inputPort").asString();
@@ -97,25 +112,17 @@ int main(int argc, char *argv[])
    }
    else{std::cout << "source port to input port connection failed! " <<std::endl;}
 
-   //Creating an instance of spatial filters
-   spatialFilters sfilters;
+   //Computing the filter values
    sfilters.computeSpatialFilters();
-   if(normalize==true){
-	   sfilters.normalizeFilters();
-   }
+   //if(normalize==true){
+   //    sfilters.normalizeFilters();
+   //}
 
-   temporalFilters tfilters;
    tfilters.computeTemporalFilters();
    //if(normalize==true){
    //    tfilters.normalizeFilters();
    //}
    //tfilters.display();
-
-
-
-
-   emorph::vtsHelper unwrap;
-
 
    while(true){ //TODO wait till the input port receives data and run
 
@@ -131,98 +138,31 @@ int main(int argc, char *argv[])
  	for (q_it = q.begin(); q_it != q.end(); q_it++) //Processing each event
             {
 
-
-
                 emorph::AddressEvent *aep = (*q_it)->getAs<emorph::AddressEvent>();
                 if(!aep) continue; //If AER is not received continue
-
                 int channel = aep->getChannel();
-                //std::cout<<"Time stamp :"<<ev_t<<" X : "<<posX<<" Y : "<<posY<<" Polarity : "<<pol<<" Channel : "<<channel<<std::endl; //Debug Code
 
-                //Processing each event with spatial filters and storing its activity level
-                //TODO include the theta code later
+                //Processing each event of channel 0
 
                 if(channel==0){
 
-                    double conv_value=0; //Filter convolution value
-                    int posX    = aep->getX();
-                    int posY    = aep->getY();
-                    int pol     = aep->getPolarity();
+                    conv_value=0; //Filter convolution value reset to zero for each event processing
 
-                    double ev_t = unwrap((*q_it)->getStamp()); //Get the current event time stamp
-                    //std::cout<< "Time stamp : " << ev_t <<std::endl;//Debug Code
-                   // std::cout<<"Pre "<<activity_mat.queryActivity(posX,posY);
-                    activity_mat.addEvent(*aep); //Adding event to the activityMat, This is where activity is set to 1
-                   // std::cout<<" New "<<activity_mat.queryActivity(posX,posY)<<std::endl;
-
-                   //Updating event history buffer with time stamps
-                   event_history.updateList(*aep);
+                    //NOTE : Update the activity when an event is about to be processed
+                    // std::cout<<"Pre "<<activity_mat.queryActivity(posX,posY);
+                     activity_mat.addEvent(*aep); //Adding event to the activityMat, This is where activity is set to 1
+                    // std::cout<<" New "<<activity_mat.queryActivity(posX,posY)<<std::endl;
 
                     //std::cout<< "Event at "<< "X : "<<posX<<" Y : "<<posY <<std::endl; //Debug code
-                    //std::cout << "Spatial filter processing..." << std::endl; //Debug code
-                	for(int j=0 ; j<11 ; j++){ //TODO check the rows and cols later
+                    spatialProcessing(*aep); //Calling spatial processing function
+                    temporalProcessing(*aep); //Calling temporal processing function
 
-                		for(int i=0 ; i<11 ; i++){
+                    // std::cout<<"  "<<convValue<<std::endl; //Debug Code
+                    // std::cout<<"Event processing done!!!"<<std::endl; //Debug Code
 
-                			//Pixel positions in activity filter
-                            int pixelX = posX + i-5;
-                	        int pixelY = posY + j-5;
-
-                	        if(pixelX >= 0 && pixelY >= 0 && pixelX <= MAX_RES && pixelY <= MAX_RES){ //Checking for borders
-
-                                long double activity_value = activity_mat.queryActivity(pixelX,pixelY);
-                                long double even_conv = activity_value * sfilters.filter_array[3].spatial_even[j][i];
-                                //long double odd_conv = activity_value * sfilters.filter_array[3].spatial_odd[j][i];
-                                //convValue = convValue + even_conv + odd_conv;
-                                conv_value = conv_value + even_conv;
-
-
-                	        }
-                	        else{
-                                //std::cout<< "Pixels Out of Bordes...."<<std::endl; //Debug Code
-                	        	continue;
-                	        }
-
-                		}
-                	}
-                   // std::cout<<"  "<<convValue<<std::endl; //Debug Code
-                   // std::cout<<"Event processing done!!!"<<std::endl; //Debug Code
-
+                    //NOTE : Update the activity after event processing
                     //std::cout<<" Pre Activity "<<activity_mat.queryActivity(posX,posY);
                     activity_mat.addEvent(*aep,conv_value); //Update the activity at the event location after processing each event
-
-                    //Setting the temporal filter iterators to vector begin
-                    tfilters.monophasic_temporal_it = tfilters.monophasic_temporal.begin();
-                    tfilters.biphasic_temporal_it = tfilters.biphasic_temporal.begin();
-
-                    std::cout << "Temporal filter processing..." << std::endl; //Debug code
-
-                    //NOTE  : problem with the temporal filter iterators
-                    //std::cout << "Monophasic filter vaalue : "<< *tfilters.monophasic_temporal_it <<std::endl;//Debug code
-                    //TODO temporal filter processing at the event location
-
-                    //NOTE : Little trick to avoid accessing list with iterators if there is only one element
-
-
-                    //cout<<"Inside the IF trick"<<endl;//Debug Code
-                    //std::cout << "Buffer Size : " <<  event_history.timeStampList[posX][posY].size() << std::endl;//Debug Code
-                    event_history.timeStampsList_it = event_history.timeStampList[posX][posY].rbegin(); //Going from latest event pushed in the back
-                    //std::cout << "Buffer value back : " <<  *event_history.timeStampsList_it<<std::endl;//Debug Code
-                    //std::cout << "Buffer value front : " <<  event_history.timeStampList[posX][posY].front() << std::endl;//Debug Code
-                    //TODO figure out a way to do temporal processing
-                    //NOTE : List size is always limited to the buffer size, took care of this in the eventbuffer code
-                    for( int list_length = 1 ; list_length <= event_history.timeStampList[posX][posY].size() ; ){
-
-                         //std::cout << "Buffer value : " <<  *event_history.timeStampsList_it<<std::endl;//Debug Code
-                         long double temporal_difference = ev_t - *event_history.timeStampsList_it; //The first value is always zero
-                         temporal_difference = temporal_difference / 1000000 ; //Converting from Micro secs TODO : check if it is right
-                         //std::cout << "Temporal difference : " << temporal_difference <<std::endl; //Debug code
-                         conv_value = conv_value + temporal_difference * (*tfilters.monophasic_temporal_it) ;
-                         std::cout<< "Convolution Value : " << conv_value <<std::endl;//Debug Code
-                         ++event_history.timeStampsList_it;
-                         ++list_length;
-                         ++tfilters.monophasic_temporal_it;
-                    }
 
 
                     //std::cout << "Mono conv value : "<< mono_conv << std::endl;//Debug Code
@@ -274,9 +214,6 @@ int main(int argc, char *argv[])
 	    }//End of event q loop
 
 
-
-
-
  	   //eventImagePort.write(eventImage); //write to the event image port
  	   //yarp.connect(eventImagePortName.c_str(),"/yarpview/img:i","tcp");
 
@@ -286,4 +223,91 @@ int main(int argc, char *argv[])
    std::cout<<"End of while loop"<<std::endl; //Debug code
 
     return 0;
+}
+
+
+double  spatialProcessing (emorph::AddressEvent &event){
+
+    int posX    = event.getX();
+    int posY    = event.getY();
+    int pol     = event.getPolarity();
+
+
+    //TODO include the theta code later
+
+    //std::cout << "Spatial filter processing..." << std::endl; //Debug code
+    for(int j=0 ; j<11 ; j++){ //TODO check the rows and cols later
+
+        for(int i=0 ; i<11 ; i++){
+
+            //Pixel positions in activity filter
+            int pixelX = posX + i-5;
+            int pixelY = posY + j-5;
+
+            if(pixelX >= 0 && pixelY >= 0 && pixelX <= MAX_RES && pixelY <= MAX_RES){ //Checking for borders
+
+                long double activity_value = activity_mat.queryActivity(pixelX,pixelY);
+                long double even_conv = activity_value * sfilters.filter_array[3].spatial_even[j][i];
+                //long double odd_conv = activity_value * sfilters.filter_array[3].spatial_odd[j][i];
+                //convValue = convValue + even_conv + odd_conv;
+                conv_value = conv_value + even_conv;
+
+
+            }
+            else{
+                //std::cout<< "Pixels Out of Bordes...."<<std::endl; //Debug Code
+                continue;
+            }
+
+        }
+    }
+
+
+}
+
+double temporalProcessing(emorph::AddressEvent &event){
+
+
+    std::cout << "Temporal filter processing..." << std::endl; //Debug code
+
+    int posX    = event.getX();
+    int posY    = event.getY();
+    int pol     = event.getPolarity();
+    double event_time = unwrap(event.getStamp()); //Get the current event time stamp
+    //std::cout<< "Time stamp : " << event_time <<std::endl;//Debug Code
+
+    //Updating event history buffer with time stamps
+    event_history.updateList(event);
+
+    //Setting the temporal filter iterators to vector begin
+    tfilters.monophasic_temporal_it = tfilters.monophasic_temporal.begin();
+    tfilters.biphasic_temporal_it = tfilters.biphasic_temporal.begin();
+
+    //NOTE  : problem with the temporal filter iterators
+    //std::cout << "Monophasic filter vaalue : "<< *tfilters.monophasic_temporal_it <<std::endl;//Debug code
+    //TODO temporal filter processing at the event location
+
+    //NOTE : Little trick to avoid accessing list with iterators if there is only one element
+
+
+    //cout<<"Inside the IF trick"<<endl;//Debug Code
+    //std::cout << "Buffer Size : " <<  event_history.timeStampList[posX][posY].size() << std::endl;//Debug Code
+    event_history.timeStampsList_it = event_history.timeStampList[posX][posY].rbegin(); //Going from latest event pushed in the back
+    //std::cout << "Buffer value back : " <<  *event_history.timeStampsList_it<<std::endl;//Debug Code
+    //std::cout << "Buffer value front : " <<  event_history.timeStampList[posX][posY].front() << std::endl;//Debug Code
+    //TODO figure out a way to do temporal processing
+    //NOTE : List size is always limited to the buffer size, took care of this in the eventbuffer code
+    for( int list_length = 1 ; list_length <= event_history.timeStampList[posX][posY].size() ; ){
+
+         //std::cout << "Buffer value : " <<  *event_history.timeStampsList_it<<std::endl;//Debug Code
+         long double temporal_difference = event_time - *event_history.timeStampsList_it; //The first value is always zero
+         temporal_difference = temporal_difference / 1000000 ; //Converting from Micro secs TODO : check if it is right
+         //std::cout << "Temporal difference : " << temporal_difference <<std::endl; //Debug code
+         conv_value = conv_value + temporal_difference * (*tfilters.monophasic_temporal_it) ;
+         std::cout<< "Convolution Value : " << conv_value <<std::endl;//Debug Code
+         ++event_history.timeStampsList_it;
+         ++list_length;
+         ++tfilters.monophasic_temporal_it;
+    }
+
 }
