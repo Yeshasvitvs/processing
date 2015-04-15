@@ -37,8 +37,10 @@ using namespace std;
 using namespace cv;
 
 //Function definition
-double spatialProcessing(emorph::AddressEvent&);
+double spatialProcessing(emorph::AddressEvent& , int& );
 double temporalProcessing(emorph::AddressEvent&);
+void motionHypothesis();
+bool motion; //Bool for doing motion hypothesis
 
 //Global variables
 
@@ -57,6 +59,10 @@ temporalFilters tfilters;
 double conv_value_even_biphasic; //Even+biphasic convolution value storage variable
 double conv_value_odd_monophasic; //Odd+monophaisc convolution value storage variable
 double conv_value; //Convolution value storage variable
+
+//Vector variable for storing different theta convolution values
+std::vector<double> conv_value_vector;
+std::vector<double>::iterator conv_value_vector_it;
 
 
 emorph::vtsHelper unwrap;
@@ -127,6 +133,8 @@ int main(int argc, char *argv[])
    //}
    //tfilters.display();
 
+
+
    while(true){ //TODO wait till the input port receives data and run
 
 
@@ -146,38 +154,58 @@ int main(int argc, char *argv[])
                 int channel = aep->getChannel();
 
                 //Processing each event of channel 0
-
                 if(channel==0){
 
-                    // convolution value reset to zero for each event processing
-                    conv_value_even_biphasic=0;
-                    conv_value_odd_monophasic=0;
-                    conv_value=0;
 
-                    //NOTE : Update the activity when an event is about to be processed
-                    // std::cout<<"Pre "<<activity_mat.queryActivity(posX,posY);
-                     activity_mat.addEvent(*aep); //Adding event to the activityMat, This is where activity is set to 1
-                    // std::cout<<" New "<<activity_mat.queryActivity(posX,posY)<<std::endl;
+                    //NOTE : Sensor X and Y are reversed
+                    std::cout<< "Event at "<< "X : "<< int ( aep->getY() ) <<" Y : "<< int ( aep->getX() ) <<std::endl; //Debug code
+                    sfilters.theta_spatial_it = sfilters.theta_spatial.begin(); //Iterating over all directions, Theta
+                    sfilters.theta_index = 0;
+                    for( ; sfilters.theta_spatial_it != sfilters.theta_spatial.end() ; ++sfilters.theta_spatial_it ){
 
-                    //std::cout<< "Event at "<< "X : "<<posX<<" Y : "<<posY <<std::endl; //Debug code
-                    spatialProcessing(*aep); //Calling spatial processing function
-                    temporalProcessing(*aep); //Calling temporal processing function
+                        // convolution value reset to zero for each event processing
+                        conv_value_even_biphasic=0;
+                        conv_value_odd_monophasic=0;
+                        conv_value=0;
 
-                    // std::cout<<"  "<<convValue<<std::endl; //Debug Code
-                    // std::cout<<"Event processing done!!!"<<std::endl; //Debug Code
+                        //NOTE : Update the activity when an event is about to be processed
+                        // std::cout<<"Pre "<<activity_mat.queryActivity(posX,posY);
+                         activity_mat.addEvent(*aep); //Adding event to the activityMat, This is where activity is set to 1
+                        // std::cout<<" New "<<activity_mat.queryActivity(posX,posY)<<std::endl;
 
-                    conv_value = conv_value_odd_monophasic + conv_value_odd_monophasic;
-                    std::cout << "Final convolution value : " << conv_value << std::endl;//Debug Code
+
+                        spatialProcessing(*aep , sfilters.theta_index); //Calling spatial processing function
+                        //temporalProcessing(*aep); //Calling temporal processing function
+
+                        // std::cout<<"  "<<convValue<<std::endl; //Debug Code
+                        // std::cout<<"Event processing done!!!"<<std::endl; //Debug Code
+
+                        //conv_value = conv_value_odd_monophasic + conv_value_odd_monophasic;
+                        //std::cout << "Final convolution value : " << conv_value << std::endl;//Debug Code
+                        conv_value_vector.push_back( conv_value_odd_monophasic + conv_value_odd_monophasic );
+
+                        ++sfilters.theta_index;
+                        motion = true;
+                    } //End of theta for loop
+
+
+                    //Generating single motion hypothesis
+                    if(motion == true){
+                        motionHypothesis();
+                    }
+
+
+
 
                     //NOTE : Update the activity after event processing
                     //std::cout<<" Pre Activity "<<activity_mat.queryActivity(posX,posY);
-                    activity_mat.addEvent(*aep,conv_value); //Update the activity at the event location after processing each event
+                    //activity_mat.addEvent(*aep,conv_value); //Update the activity at the event location after processing each event
 
 
                     //std::cout << "Mono conv value : "<< mono_conv << std::endl;//Debug Code
 
                     //After processing each event update the whole activity matrix
-                    long double maxvalue=0;
+                    //long double maxvalue=0;
 
                     /*for(int v=0; v< MAX_RES; v++){
 
@@ -234,12 +262,44 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+void motionHypothesis(){
 
-double  spatialProcessing (emorph::AddressEvent &event){
+
+    //Velocity components set to zero
+    double Ux = 1;
+    double Uy =1 ;
+
+    //Code for single motion hypothesis generation
+    conv_value_vector_it = conv_value_vector.begin();
+    sfilters.theta_spatial_it = sfilters.theta_spatial.begin();
+    for(; conv_value_vector_it != conv_value_vector.end() ; ++conv_value_vector_it){
+
+         //std::cout << "The convolotion value : " << *conv_value_vector_it ; //Debug Code
+        // std::cout << " for theta Value  " << *sfilters.theta_spatial_it << std::endl; //Debug Code
+
+         Ux = Ux + (*conv_value_vector_it ) * ( cos(*sfilters.theta_spatial_it) ) ;
+         Uy = Uy - (*conv_value_vector_it ) * ( sin(*sfilters.theta_spatial_it) );
+
+
+         ++sfilters.theta_spatial_it;
+    }
+
+    std::cout << "Velocity Components Ux : " << Ux << " Uy : " << Uy << std::endl; //Debug Code
+
+    //Clear the convolution vector after processing for single motion hypothesis
+    conv_value_vector.erase(conv_value_vector.begin(), conv_value_vector.end());
+    motion = false;
+}
+
+
+
+
+double  spatialProcessing (emorph::AddressEvent &event , int &theta_index){
 
     int posX    = event.getX();
     int posY    = event.getY();
     //int polarity     = event.getPolarity();
+    //std::cout << "Theta value : "<<theta_index <<std::endl; //Debug Code
 
 
     //TODO include the theta code later
@@ -258,16 +318,17 @@ double  spatialProcessing (emorph::AddressEvent &event){
                 long double activity_value = activity_mat.queryActivity(pixelX,pixelY);
 
                 //Even filter convolution
-                long double even_conv = activity_value * sfilters.filter_array[3].spatial_even[j][i];
+                long double even_conv = activity_value * sfilters.filter_array[theta_index].spatial_even[j][i];
                 conv_value_even_biphasic = conv_value_even_biphasic + even_conv;
 
                 //Odd filter convolution
-                long double odd_conv = activity_value * sfilters.filter_array[3].spatial_odd[j][i];
+                long double odd_conv = activity_value * sfilters.filter_array[theta_index].spatial_odd[j][i];
                 conv_value_odd_monophasic= conv_value_odd_monophasic + odd_conv;
 
 
             }
             else{
+
                 //std::cout<< "Pixels Out of Bordes...."<<std::endl; //Debug Code
                 continue;
             }
@@ -275,13 +336,17 @@ double  spatialProcessing (emorph::AddressEvent &event){
         }
     }
 
+    //Call the temporal processing function here
+    temporalProcessing(event); //Calling temporal processing function
 
 }
+
+
 
 double temporalProcessing(emorph::AddressEvent &event){
 
 
-    std::cout << "Temporal filter processing..." << std::endl; //Debug code
+    //std::cout << "Temporal filter processing..." << std::endl; //Debug code
 
     int posX    = event.getX();
     int posY    = event.getY();
@@ -297,13 +362,11 @@ double temporalProcessing(emorph::AddressEvent &event){
     tfilters.biphasic_temporal_it = tfilters.biphasic_temporal.begin();
 
 
-    //std::cout << "Monophasic filter vaalue : "<< *tfilters.monophasic_temporal_it <<std::endl;//Debug code
-
     //std::cout << "Buffer Size : " <<  event_history.timeStampList[posX][posY].size() << std::endl;//Debug Code
     event_history.timeStampsList_it = event_history.timeStampList[posX][posY].rbegin(); //Going from latest event pushed in the back
     //std::cout << "Buffer value back : " <<  *event_history.timeStampsList_it<<std::endl;//Debug Code
     //std::cout << "Buffer value front : " <<  event_history.timeStampList[posX][posY].front() << std::endl;//Debug Code
-    //TODO figure out a way to do temporal processing
+
     //NOTE : List size is always limited to the buffer size, took care of this in the eventbuffer code
     for( int list_length = 1 ; list_length <= event_history.timeStampList[posX][posY].size() ; ){
 
@@ -311,6 +374,7 @@ double temporalProcessing(emorph::AddressEvent &event){
          long double temporal_difference = event_time - *event_history.timeStampsList_it; //The first value is always zero
          temporal_difference = temporal_difference / 1000000 ; //Converting from Micro secs TODO : check if it is right
 
+         //TODO check if the following processing is correct
          //std::cout << "Temporal difference : " << temporal_difference <<std::endl; //Debug code
          conv_value_odd_monophasic = conv_value_odd_monophasic + temporal_difference * (*tfilters.monophasic_temporal_it) ;
          conv_value_even_biphasic = conv_value_even_biphasic + temporal_difference * (*tfilters.biphasic_temporal_it) ;
@@ -325,5 +389,6 @@ double temporalProcessing(emorph::AddressEvent &event){
          ++tfilters.monophasic_temporal_it;
          ++tfilters.biphasic_temporal_it;
     }
+
 
 }

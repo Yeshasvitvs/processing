@@ -68,7 +68,7 @@ class spatialFilters{
 					long double spatial_even[MAX_SIZE][MAX_SIZE];
 					long double spatial_odd[MAX_SIZE][MAX_SIZE];
 
-				} ;
+        } ;
 
 				normalized_spatial_filter_array* normalized_filter_array;
 
