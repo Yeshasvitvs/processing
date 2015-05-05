@@ -50,6 +50,9 @@ class spatialFilters{
 		double gamma_spatial; //Aspect ratio, controls the ellipticity of the gabor filter
 		double lambda_spatial; //Wavelength
 		double sigma_spatial; //standard deviation
+        int number_directions; //Variable to store the number of directions
+
+
 
 		struct spatial_filter_array{
 

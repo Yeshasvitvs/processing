@@ -6,6 +6,10 @@
 
 #IncludeRegexTransform: 
 
+/home/yeshi/qt/processing/eventHistoryBuffer.cpp
+eventHistoryBuffer.hpp
+/home/yeshi/qt/processing/eventHistoryBuffer.hpp
+
 /home/yeshi/qt/processing/eventHistoryBuffer.hpp
 yarp/sig/all.h
 -

@@ -30,8 +30,9 @@ double eventHistoryBuffer::updateList(emorph::AddressEvent &event){
 
 
     //std::cout<< "Updating the List..." <<std::endl;//Debug Code
-    x = event.getX();
-    y = event.getY();
+    //NOTE : The Sensor X and Y are reversed
+    x = event.getY();
+    y = event.getX();
 
     if(x < 0 || x > width-1 || y < 0 || y > height-1) return -1;
 

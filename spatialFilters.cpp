@@ -14,10 +14,12 @@ spatialFilters::spatialFilters(){
     std::cout<<"Spatial Filter parameters initialization..."<<std::endl;
 	debug=true; //Debug Boolean
 	//Spatial filters default parameters
+    number_directions = 1;
 	theta_step_size=0.25*M_PI;
 	 for(double i=0;i<MAX_THETA;i=i+theta_step_size){
 		 //std::cout<<" theta Value : "<<i<<std::endl;//Debug code
 		 theta_spatial.push_back(i); //Orientation of the gabor filter
+         ++number_directions;
 	 }
 	 theta_index=0;
 	 spatial_kernel_size=11; //size of the spatial kernel
